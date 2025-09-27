@@ -1,0 +1,68 @@
+
+#include <DHT.h>
+#include <OneWire.h>
+#include <DallasTemperature.h>
+
+// Sensor Pins
+#define DHTPIN1 4       // DHT22 for Banana 1
+#define DHTPIN2 6       // DHT22 for Banana 2
+#define DHTTYPE DHT22
+
+#define MQ135PIN1 A0    // MQ135 Gas sensor for Banana 1
+#define MQ135PIN2 A1    // MQ135 Gas sensor for Banana 2
+
+#define ONE_WIRE_BUS 5  // DS18B20 Data pin (Banana 1 temperature)
+
+// Initialize sensors
+DHT dht1(DHTPIN1, DHTTYPE);
+DHT dht2(DHTPIN2, DHTTYPE);
+OneWire oneWire(ONE_WIRE_BUS);
+DallasTemperature sensors(&oneWire);
+
+#define GAS_SAMPLES 10  // Number of readings to average
+
+void setup() {
+  Serial.begin(9600);
+  dht1.begin();
+  dht2.begin();
+  sensors.begin();
+}
+
+int readGas(int pin) {
+  long sum = 0;
+  for (int i = 0; i < GAS_SAMPLES; i++) {
+    sum += analogRead(pin);
+    delay(50);
+  }
+  int avg = sum / GAS_SAMPLES;
+  // Scale to 0-100 for ripeness detection
+  int scaled = map(avg, 0, 1023, 0, 100);
+  return scaled;
+}
+
+void loop() {
+  // Read Banana 1
+  float humidity1 = dht1.readHumidity();
+  sensors.requestTemperatures();
+  float temp1 = sensors.getTempCByIndex(0);
+  int gas1 = readGas(MQ135PIN1);
+
+  // Read Banana 2
+  float humidity2 = dht2.readHumidity();
+  int gas2 = readGas(MQ135PIN2);
+
+  // Check if readings failed
+  if (isnan(humidity1) || isnan(temp1) || isnan(humidity2)) {
+    Serial.println("Failed to read from sensors!");
+    return;
+  }
+
+  // Send data as CSV: hum1,temp1,gas1,hum2,gas2
+  Serial.print(humidity1); Serial.print(",");
+  Serial.print(temp1); Serial.print(",");
+  Serial.print(gas1); Serial.print(",");
+  Serial.print(humidity2); Serial.print(",");
+  Serial.println(gas2);
+
+  delay(2000);
+}
